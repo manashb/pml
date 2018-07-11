@@ -1,0 +1,122 @@
+---
+output: html_document
+---
+
+# Course project - Practical Machine Learning
+
+## Overview
+
+Now it is possible to collect data about personal activity relatively inexpensively using devices like Jawbone Up, Nike FuelBand, Fitbit etc. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. The goal of our project is to predict the manner in which they did the exercise.
+
+### Data Source
+
+* Training data - https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+* Testing Data - https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+## Loading requiring library
+
+```{r}
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+library(randomForest)
+library(corrplot)
+library(gbm)
+```
+
+## Loading and cleaning data
+
+```{r}
+train_in <- read.csv('pml-training.csv', header = TRUE)
+test_in <- read.csv('pml-testing.csv', header = TRUE)
+```
+
+### Removing NA, blank values and first 7 cols
+
+```{r}
+ColToRemove <- which(colSums(is.na(train_in) |train_in=="")>0.9*dim(train_in)[1]) 
+TrainDataClean <- train_in[,-ColToRemove]
+TrainDataClean <- TrainDataClean[,-c(1:7)]
+```
+
+```{r}
+ColToRemove <- which(colSums(is.na(test_in) |test_in=="")>0.9*dim(test_in)[1]) 
+TestDataClean <- test_in[,-ColToRemove]
+TestDataClean <- TestDataClean[,-1]
+```
+
+## Preparing datasets for prediction
+
+```{r}
+set.seed(1234) 
+inTrain <- createDataPartition(y = TrainDataClean$classe, p = 0.7, list = FALSE)
+traindata <- TrainDataClean[inTrain, ]
+testdata <- TrainDataClean[-inTrain, ]
+```
+
+## Building Model
+
+We are using following algorithims -
+
+* Classification trees
+* Random forests
+
+### Classification trees
+
+* Accuracy - 0.6879
+* Expected out-of-sample error - 31.21%
+
+```{r}
+set.seed(12345)
+decisionTreeModel <- rpart(classe ~ ., data=traindata, method="class")
+fancyRpartPlot(decisionTreeModel)
+```
+
+Validating 'decisionTreeModel' with test data
+
+```{r}
+predictTreeModel <- predict(decisionTreeModel, testdata, type = "class")
+cmtree <- confusionMatrix(predictTreeModel, testdata$classe)
+cmtree
+```
+
+Lets Plot the tree
+
+```{r}
+plot(cmtree$table, col = cmtree$byClass, 
+     main = paste("Decision Tree - Accuracy =", round(cmtree$overall['Accuracy'], 4)))
+```
+
+### Random forests
+
+* Accuracy - 0.9968
+* Expected out-of-sample error - 0.32%
+
+```{r}
+set.seed(12345)
+modelRF <- randomForest(classe ~ ., data=traindata)
+predictionRF <- predict(modelRF, testdata, type = "class")
+cmrf <- confusionMatrix(predictionRF, testdata$classe)
+cmrf
+```
+
+Lets plot the model
+
+```{r}
+plot(modelRF)
+```
+
+```{r}
+plot(cmrf$table, col = cmrf$byClass, main = paste("Random Forest Confusion Matrix: Accuracy =", round(cmrf$overall['Accuracy'], 4)))
+```
+
+## Conclusion and applying model on test data
+
+From the above analysis Random Forests is better one. Therefore applying it to predict the values of classe for the test data set.
+
+```{r}
+FinalTestPred <- predict(modelRF,newdata=TestDataClean)
+FinalTestPred
+```
